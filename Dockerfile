@@ -60,6 +60,10 @@ RUN dpkg --add-architecture i386 \
         libssl-dev \
         libmariadb-dev \
         libduktape207 \
+        liblua5.1-0 \
+        liblua5.1-0:i386 \
+        liblua5.1-0-dev \
+        liblua5.1-0-dev:i386 \
         liblua5.3-0 \
         liblua5.3-dev \
         zlib1g \
