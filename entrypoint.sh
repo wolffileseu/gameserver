@@ -13,7 +13,7 @@ cd /home/container || exit 1
 
 # Print startup info
 printf "\033[1m\033[33mcontainer@pterodactyl~ \033[0mWolffiles.eu Game Server\n"
-printf "\033[1m\033[33mcontainer@pterodactyl~ \033[0mArch: $(uname -m) | 32-bit support: $([ -f /lib/ld-linux.so.2 ] && echo 'YES' || echo 'NO')\n"
+printf "\033[1m\033[33mcontainer@pterodactyl~ \033[0mArch: %s | 32-bit support: %s\n" "$(uname -m)" "$([ -f /lib/ld-linux.so.2 ] && echo 'YES' || echo 'NO')"
 
 # Convert all of the "{{VARIABLE}}" parts of the command into the expected shell
 # variable format of "${VARIABLE}" before evaluating the string and automatically
@@ -24,5 +24,5 @@ PARSED=$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g' | eval echo "$(cat
 # from the container itself.
 printf "\033[1m\033[33mcontainer@pterodactyl~ \033[0m%s\n" "$PARSED"
 
-# Run the server
-eval "$PARSED"
+# shellcheck disable=SC2086
+exec env ${PARSED}
