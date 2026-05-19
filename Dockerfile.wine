@@ -1,0 +1,230 @@
+# ============================================================================
+# Wolffiles.eu Game Server Image - Wine Variant
+# ----------------------------------------------------------------------------
+# Copyright (c) 2026 Wolffiles.eu (Wahke / Kevin)
+# Licensed under the MIT License - see LICENSE file in repository root.
+#
+# Repository:    https://github.com/wolffileseu/gameserver
+# Tag:           ghcr.io/wolffileseu/gameserver:wine
+# Maintainer:    admin@wolffiles.eu
+# Description:   Wine-enabled variant of the Wolffiles.eu gameserver image
+#                for hosting Windows-only legacy game server binaries
+#                (e.g. WolfMP.exe, qagame_mp_x86.dll, Windows-only Trickjump
+#                mods) on Linux hosts via Pterodactyl. Built standalone on
+#                debian:bookworm-slim with the same base packages as the
+#                Linux-native variant plus winehq-stable + Xvfb.
+#
+# ----------------------------------------------------------------------------
+# Third-Party Software Notice
+# ----------------------------------------------------------------------------
+# This image is intended to host third-party game server software. The game
+# binaries, mods, maps, and bot waypoints are NOT bundled in this image and
+# must be provided separately (e.g. via the Pterodactyl egg install script)
+# in compliance with their respective licenses.
+#
+# Runtime components:
+#   - Wine (winehq-stable) is licensed under LGPL-2.1+.
+#       https://www.winehq.org
+#   - Winetricks (pelican-eggs fork) is LGPL-2.1+.
+#       https://github.com/pelican-eggs/winetricks
+#   - Xvfb / xauth are MIT-licensed.
+#   - rcon-cli (gorcon) is MIT-licensed.
+#       https://github.com/gorcon/rcon-cli
+#
+# Game / Mod / Bot copyrights:
+#   - Return to Castle Wolfenstein (c) id Software / Activision
+#       Source code released under GPL-3.0 in 2010.
+#   - Wolfenstein: Enemy Territory (c) Splash Damage / id Software / Activision
+#       Freeware distribution, source under GPL-3.0.
+#   - ET: Legacy, iortcw, RtcwPro, and similar engine forks - GPL-3.0
+#   - Omni-Bot, Fritzbot, OSP, ETPub, NoQuarter, Silent, ETPro, NitMod,
+#     Jaymod, ETJump, TJMod, ETNam, ETRun, Bani, Shrub and other mods belong
+#     to their respective authors.
+#
+# This Dockerfile and the entrypoint script are MIT-licensed; the runtime
+# software composed inside the container retains its original license.
+#
+# Operators of derived images are responsible for ensuring their use of the
+# game binaries and mod files complies with the upstream license terms,
+# including (but not limited to) any GPL source-distribution obligations.
+# ============================================================================
+
+FROM debian:bookworm-slim
+
+LABEL org.opencontainers.image.title="Wolffiles.eu Game Server (Wine)"
+LABEL org.opencontainers.image.description="Debian Bookworm with Wine + Xvfb + 32-bit support for Windows-only ET / ET:Legacy / RtCW mod servers"
+LABEL org.opencontainers.image.authors="admin@wolffiles.eu"
+LABEL org.opencontainers.image.vendor="Wolffiles.eu"
+LABEL org.opencontainers.image.source="https://github.com/wolffileseu/gameserver"
+LABEL org.opencontainers.image.url="https://wolffiles.eu"
+LABEL org.opencontainers.image.documentation="https://wolffiles.eu/docs/gameserver"
+LABEL org.opencontainers.image.licenses="MIT"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ----------------------------------------------------------------------------
+# Pterodactyl-required container user
+# ----------------------------------------------------------------------------
+RUN useradd -m -d /home/container -s /bin/bash container \
+    && ln -s /home/container/ /nonexistent
+
+ENV USER=container
+ENV HOME=/home/container
+
+# ----------------------------------------------------------------------------
+# Base system packages
+#
+# Identical core dependencies as the Linux-native gameserver image so both
+# variants behave consistently. Includes 32-bit (i386) runtime libraries
+# needed for legacy idTech3 binaries (also relevant under Wine because Wine
+# itself uses host i386 libs for 32-bit Windows guests).
+# ----------------------------------------------------------------------------
+RUN dpkg --add-architecture i386 \
+    && apt update \
+    && apt upgrade -y \
+    && apt install -y --no-install-recommends \
+        bash \
+        ca-certificates \
+        curl \
+        wget \
+        git \
+        tar \
+        zip \
+        unzip \
+        xz-utils \
+        binutils \
+        cabextract \
+        p7zip-full \
+        iproute2 \
+        net-tools \
+        netcat-openbsd \
+        telnet \
+        tzdata \
+        locales \
+        tini \
+        sqlite3 \
+        libsqlite3-dev \
+        ffmpeg \
+        gnupg2 \
+        apt-transport-https \
+        software-properties-common \
+        gcc \
+        g++ \
+        gdb \
+        make \
+        libc6 \
+        libgcc-s1 \
+        libatomic1 \
+        liblzo2-2 \
+        libsdl1.2debian \
+        libsdl2-2.0-0 \
+        libsdl2-2.0-0:i386 \
+        libfontconfig1 \
+        libicu72 \
+        libunwind8 \
+        libssl-dev \
+        libmariadb-dev \
+        libduktape207 \
+        liblua5.1-0 \
+        liblua5.1-0:i386 \
+        liblua5.1-0-dev \
+        liblua5.1-0-dev:i386 \
+        liblua5.3-0 \
+        liblua5.3-dev \
+        zlib1g \
+        zlib1g-dev \
+        rapidjson-dev \
+        # RtCW / RtcwPro runtime dependencies
+        libjansson4 \
+        libjansson4:i386 \
+        libcurl4 \
+        libcurl4:i386 \
+        # 32-bit base runtime
+        lib32gcc-s1 \
+        lib32stdc++6 \
+        libc6-i386 \
+        libc6:i386 \
+        libstdc++6:i386 \
+        libgcc-s1:i386 \
+        zlib1g:i386 \
+        # Wine prerequisites
+        libntlm0 \
+        winbind \
+        xvfb \
+        xauth \
+        python3 \
+        libncurses5:i386 \
+        libncurses6:i386 \
+    && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
+    && locale-gen \
+    && update-locale LANG=en_US.UTF-8 \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+ENV LC_ALL=en_US.UTF-8
+
+# ----------------------------------------------------------------------------
+# Install Wine (stable branch from official WineHQ repo)
+#
+# Using the official WineHQ Debian Bookworm repository for the latest stable
+# Wine. --install-recommends pulls in wine32, wine64, wine-binfmt etc.
+# ----------------------------------------------------------------------------
+RUN mkdir -pm755 /etc/apt/keyrings \
+    && wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key \
+    && wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/debian/dists/bookworm/winehq-bookworm.sources \
+    && apt update \
+    && apt install --install-recommends -y \
+        winehq-stable \
+        wine-binfmt \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# ----------------------------------------------------------------------------
+# Install winetricks (pelican-eggs fork - more reliable than upstream)
+# ----------------------------------------------------------------------------
+RUN wget -q -O /usr/sbin/winetricks https://raw.githubusercontent.com/pelican-eggs/winetricks/master/src/winetricks \
+    && chmod +x /usr/sbin/winetricks
+
+# ----------------------------------------------------------------------------
+# Install rcon CLI for game server remote control
+# ----------------------------------------------------------------------------
+RUN cd /tmp \
+    && curl -sSL -o rcon.tar.gz https://github.com/gorcon/rcon-cli/releases/download/v0.10.3/rcon-0.10.3-amd64_linux.tar.gz \
+    && tar xzf rcon.tar.gz \
+    && mv rcon-0.10.3-amd64_linux/rcon /usr/local/bin/ \
+    && rm -rf rcon.tar.gz rcon-0.10.3-amd64_linux
+
+# ----------------------------------------------------------------------------
+# Wine defaults
+#
+# WINEARCH=win32 is the correct default for legacy idTech3-era binaries
+# (WolfMP.exe, qagame_mp_x86.dll). Can be overridden per-server via the
+# Pterodactyl egg variable.
+#
+# XVFB=1 + DISPLAY=:0 signals our entrypoint.sh to start an Xvfb virtual
+# display before launching Wine (headless mode for dedicated servers).
+#
+# WINEDLLOVERRIDES suppresses the Mono/Gecko auto-install dialogs that
+# would otherwise hang a headless first start.
+# ----------------------------------------------------------------------------
+ENV WINEARCH=win32
+ENV WINEPREFIX=/home/container/.wine
+ENV WINEDEBUG=-all
+ENV WINEDLLOVERRIDES="mscoree,mshtml="
+ENV DISPLAY=:0
+ENV DISPLAY_WIDTH=800
+ENV DISPLAY_HEIGHT=600
+ENV DISPLAY_DEPTH=16
+ENV XVFB=1
+ENV AUTO_UPDATE=0
+
+USER container
+WORKDIR /home/container
+
+COPY --chown=container:container ./entrypoint-wine.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
+CMD ["/entrypoint.sh"]
