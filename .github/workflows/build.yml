@@ -15,7 +15,16 @@ jobs:
     permissions:
       contents: read
       packages: write
-
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - name: latest
+            dockerfile: Dockerfile
+            extra_tag: debian-bookworm
+          - name: wine
+            dockerfile: Dockerfile.wine
+            extra_tag: wine-debian-bookworm
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,12 +39,15 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push
+      - name: Build and Push (${{ matrix.variant.name }})
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ${{ matrix.variant.dockerfile }}
           push: true
           platforms: linux/amd64
           tags: |
-            ghcr.io/wolffileseu/gameserver:latest
-            ghcr.io/wolffileseu/gameserver:debian-bookworm
+            ghcr.io/wolffileseu/gameserver:${{ matrix.variant.name }}
+            ghcr.io/wolffileseu/gameserver:${{ matrix.variant.extra_tag }}
+          cache-from: type=gha,scope=${{ matrix.variant.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.variant.name }}
